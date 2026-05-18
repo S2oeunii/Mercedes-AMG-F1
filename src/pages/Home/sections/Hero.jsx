@@ -46,6 +46,7 @@ function Hero({ onScrollDown, step, setStep, isActive }) {
   }, [isActive, onScrollDown, setStep]);
 
   return (
+    // 260518 수정사항 : 메인 swiper로 변경 -> 슬라이드로
     <section className="flex justify-between max-sm:items-start sm:items-end max-sm:pt-[171px] sm:pt-[25.5vw] px-[5.2vw] pb-[5.2vw] min-h-screen relative overflow-hidden">
 
       {/* 데스크탑 배경 */}
