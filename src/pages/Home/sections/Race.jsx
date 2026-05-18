@@ -217,6 +217,7 @@ const Race = () => {
     setMobileIndex(next);
   };
 
+  // 260518 이미지가 끊기지 않도록 같은거 중복해서 15개 // 
   return (
     <div className='bg-[linear-gradient(to_bottom,#000000db_0%,#00000033_100%)]
       sm:bg-[linear-gradient(to_bottom,#000000c7_0%,#00000033_100%)]

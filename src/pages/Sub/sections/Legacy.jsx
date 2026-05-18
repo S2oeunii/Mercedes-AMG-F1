@@ -157,6 +157,7 @@ const Legacy = () => {
         </p>
       </div>
 
+{/* 260518 수정사항 : 스크롤에 따라 다음으로 이동하도록 */}
       {/* 중단: ulDesc + ul */}
       <div className='flex flex-col-reverse sm:flex-row gap-[28px] sm:gap-[5.47vw] sm:items-end
           mt-20 sm:mt-[8.75vw] sm:mb-[6.56vw] sm:ml-[9.38vw]'>
