@@ -23,7 +23,19 @@ const CARDS = [
   { id: 4, image: austria, hoverImage: austriaHover },
 ];
 
-const TOTAL   = CARDS.length;
+const TOTAL   = CARDS.length;       // 5
+const CLONES  = 2;                  // 양쪽 클론 수
+
+// [Spain, Austria, Miami, Canada, Monaco, Spain, Austria, Miami, Canada] — 9개
+const EXTENDED_CARDS = [
+  ...CARDS.slice(-CLONES),
+  ...CARDS,
+  ...CARDS.slice(0, CLONES),
+];
+const EXT_TOTAL  = EXTENDED_CARDS.length;  // 9
+const REAL_START = CLONES;                 // 2 (첫 번째 실제 카드 = Miami)
+const REAL_END   = CLONES + TOTAL - 1;    // 6 (마지막 실제 카드 = Austria)
+
 const CARD_VW = 15.63;
 const GAP_VW  = 2.40;
 
@@ -41,17 +53,16 @@ function lerp(keys, t) {
 
 const WIDTH_KEYS   = [[0, 15.63], [1, 16.41], [2, 18.85]];
 const ROT_KEYS     = [[0, 0],    [1, 18],    [2, 32]];
-// opacity를 3까지 연장 → absOffset 2→3 구간에서 서서히 페이드아웃
-// (visibility:hidden 대신 사용해 GPU 레이어를 유지, 이미지 재업로드 지연 방지)
 const OPACITY_KEYS = [[0, 1.0], [1, 0.6], [2, 0.3], [3, 0.0]];
 
 const GAP_OUTER_VW = 4.05;
-const _p1    = WIDTH_KEYS[0][1] / 2 + GAP_VW       + WIDTH_KEYS[1][1] / 2; // 18.42vw
-const _p2    = _p1 + WIDTH_KEYS[1][1] / 2 + GAP_OUTER_VW + WIDTH_KEYS[2][1] / 2; // 40.10vw
-const _step  = _p2 - _p1; // 21.68vw (offset 1→2 간격 유지)
+const _p1    = WIDTH_KEYS[0][1] / 2 + GAP_VW       + WIDTH_KEYS[1][1] / 2;
+const _p2    = _p1 + WIDTH_KEYS[1][1] / 2 + GAP_OUTER_VW + WIDTH_KEYS[2][1] / 2;
+const _step  = _p2 - _p1;
 const POS_KEYS_VW = [[0, 0], [1, _p1], [2, _p2], [3, _p2 + _step], [4, _p2 + _step * 2]];
 
-function springTo(posRef, target, onUpdate) {
+// onComplete 콜백 추가 — 스프링 완료 후 무한루프 점프 처리
+function springTo(posRef, target, onUpdate, onComplete) {
   let velocity = 0;
   const stiffness = 300;
   const damping   = 30;
@@ -70,6 +81,7 @@ function springTo(posRef, target, onUpdate) {
     } else {
       posRef.current = target;
       onUpdate(target);
+      onComplete?.();
     }
   };
   rafId = requestAnimationFrame(step);
@@ -78,7 +90,7 @@ function springTo(posRef, target, onUpdate) {
 
 const Race = () => {
   // ── Desktop ──
-  const posRef       = useRef(0);
+  const posRef       = useRef(REAL_START);   // 2 = 첫 실제 카드(Miami)에서 시작
   const cancelAnim   = useRef(null);
   const itemRefs     = useRef([]);
   const cardRefs     = useRef([]);
@@ -89,7 +101,7 @@ const Race = () => {
   const trackRef     = useRef(null);
 
   // ── Mobile ──
-  const [mobileIndex,       setMobileIndex]       = useState(0);
+  const [mobileIndex,       setMobileIndex]       = useState(REAL_START);
   const [mobileOffset,      setMobileOffset]       = useState(0);
   const [mobileDragOffset,  setMobileDragOffset]   = useState(0);
   const [isGrabbing,        setIsGrabbing]         = useState(false);
@@ -131,10 +143,21 @@ const Race = () => {
     return () => window.removeEventListener('resize', onResize);
   }, [updateItems]);
 
+  // 스프링 완료 후 클론 위치면 실제 위치로 점프 (데스크탑 무한루프)
   const doSnap = useCallback((target) => {
-    const clamped = Math.max(0, Math.min(TOTAL - 1, target));
+    const rounded = Math.round(target);
+    const clamped = Math.max(0, Math.min(EXT_TOTAL - 1, rounded));
     cancelAnim.current?.();
-    cancelAnim.current = springTo(posRef, clamped, updateItems);
+    cancelAnim.current = springTo(posRef, clamped, updateItems, () => {
+      const s = posRef.current;
+      if (s < REAL_START) {
+        posRef.current = s + TOTAL;
+        updateItems(posRef.current);
+      } else if (s > REAL_END) {
+        posRef.current = s - TOTAL;
+        updateItems(posRef.current);
+      }
+    });
   }, [updateItems]);
 
   // Desktop: wheel
@@ -166,7 +189,7 @@ const Race = () => {
     const stepPx = POS_KEYS_VW[1][1] * window.innerWidth / 100;
     const dx     = e.clientX - dragStartX.current;
     const newPos = dragStartPos.current - dx / stepPx;
-    posRef.current = Math.max(0, Math.min(TOTAL - 1, newPos));
+    posRef.current = Math.max(0, Math.min(EXT_TOTAL - 1, newPos));
     updateItems(posRef.current);
   };
   const onDesktopUp = () => {
@@ -175,7 +198,7 @@ const Race = () => {
     doSnap(Math.round(posRef.current));
   };
 
-  // Mobile: compute center offset
+  // Mobile: compute center offset (EXTENDED_CARDS 기준)
   useLayoutEffect(() => {
     const compute = () => {
       if (!mobileListRef.current || window.innerWidth >= 640) return;
@@ -185,6 +208,18 @@ const Race = () => {
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
+  }, [mobileIndex]);
+
+  // 모바일 무한루프: 클론 위치 정착 후 실제 위치로 순간 점프
+  useEffect(() => {
+    if (mobileIndex >= REAL_START && mobileIndex <= REAL_END) return;
+    const realIdx = mobileIndex < REAL_START ? mobileIndex + TOTAL : mobileIndex - TOTAL;
+    const timer = setTimeout(() => {
+      setIsGrabbing(true);
+      setMobileIndex(realIdx);
+      requestAnimationFrame(() => requestAnimationFrame(() => setIsGrabbing(false)));
+    }, 520);
+    return () => clearTimeout(timer);
   }, [mobileIndex]);
 
   // Mobile: mouse drag
@@ -200,7 +235,7 @@ const Race = () => {
     const cardW = 197, gap = 16, step = cardW + gap;
     const raw      = e.clientX - mobileStartX.current;
     const maxRight =  mobileIndex * step;
-    const maxLeft  = -(CARDS.length - 1 - mobileIndex) * step;
+    const maxLeft  = -(EXT_TOTAL - 1 - mobileIndex) * step;
     const clamped  = Math.max(maxLeft, Math.min(maxRight, raw));
     mobileDragOffsetRef.current = clamped;
     setMobileDragOffset(clamped);
@@ -210,14 +245,13 @@ const Race = () => {
     isMobileDragging.current = false;
     const cardW = 197, gap = 16;
     const shift = -mobileDragOffsetRef.current / (cardW + gap);
-    const next  = Math.max(0, Math.min(CARDS.length - 1, Math.round(mobileIndex + shift)));
+    const next  = Math.max(0, Math.min(EXT_TOTAL - 1, Math.round(mobileIndex + shift)));
     mobileDragOffsetRef.current = 0;
     setMobileDragOffset(0);
     setIsGrabbing(false);
     setMobileIndex(next);
   };
 
-  // 260518 이미지가 끊기지 않도록 같은거 중복해서 15개 // 
   return (
     <div className='bg-[linear-gradient(to_bottom,#000000db_0%,#00000033_100%)]
       sm:bg-[linear-gradient(to_bottom,#000000c7_0%,#00000033_100%)]
@@ -236,23 +270,19 @@ const Race = () => {
         {/* 카드 영역 */}
         <div className='relative sm:h-[20.93vw] mt-15 mb-[45px] sm:mt-[6.41vw] sm:mb-[1.61vw] -mx-6 sm:mx-0'>
 
-          {/* ── Desktop 3D carousel: absolute, 100vw, escapes section padding ── */}
+          {/* ── Desktop 3D carousel ── */}
           <div
             ref={trackRef}
             className='hidden sm:block absolute top-0 h-full cursor-grab active:cursor-grabbing select-none'
-            style={{
-              left:        'calc(-14.58vw)',
-              width:       '100vw',
-              perspective: '62.5vw',
-            }}
+            style={{ left: 'calc(-14.58vw)', width: '100vw', perspective: '62.5vw' }}
             onMouseDown={onDesktopDown}
             onMouseMove={onDesktopMove}
             onMouseUp={onDesktopUp}
             onMouseLeave={onDesktopUp}
           >
-            {CARDS.map((card, i) => (
+            {EXTENDED_CARDS.map((card, i) => (
               <div
-                key={card.id}
+                key={i}
                 ref={(el) => { itemRefs.current[i] = el; }}
                 className='absolute left-1/2 top-1/2'
                 style={{ willChange: 'transform, opacity' }}
@@ -262,11 +292,7 @@ const Race = () => {
                   className='relative overflow-hidden'
                   style={{ width: `${CARD_VW}vw` }}
                 >
-                  <img
-                    src={card.image} alt=""
-                    className='w-full h-auto block pointer-events-none'
-                    draggable={false}
-                  />
+                  <img src={card.image} alt="" className='w-full h-auto block pointer-events-none' draggable={false} />
                   <img
                     src={card.hoverImage} alt=""
                     className='absolute inset-0 w-full h-full object-cover pointer-events-none
@@ -296,14 +322,13 @@ const Race = () => {
                 willChange: 'transform',
               }}
             >
-              {CARDS.map((card, i) => {
+              {EXTENDED_CARDS.map((card, i) => {
                 const dist  = Math.abs(i - mobileIndex);
                 const scale = dist === 0 ? 1 : dist === 1 ? 0.87 : 0.77;
                 return (
                   <div
-                    key={card.id}
-                    className={`flex-shrink-0 relative overflow-hidden group
-                      w-[197px] h-[219px]
+                    key={i}
+                    className={`flex-shrink-0 relative overflow-hidden w-[197px] h-[219px]
                       ${dist !== 0 ? 'opacity-40' : ''}`}
                     style={{
                       transform:       `scale(${scale})`,
@@ -311,29 +336,23 @@ const Race = () => {
                       transformOrigin: 'center center',
                     }}
                   >
-                    <img
-                      src={card.image} alt=""
-                      className='w-full h-auto block pointer-events-none'
-                      draggable={false}
-                    />
+                    <img src={card.image} alt="" className='w-full h-auto block pointer-events-none' draggable={false} />
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Mobile arrows */}
+          {/* Mobile arrows — 무한루프이므로 항상 활성 */}
           <div
-            className='sm:hidden absolute left-6 top-1/2 -translate-y-1/2 z-20 transition-opacity'
-            style={{ opacity: mobileIndex === 0 ? 0.4 : 1, pointerEvents: mobileIndex === 0 ? 'none' : 'auto' }}
+            className='sm:hidden absolute left-6 top-1/2 -translate-y-1/2 z-20'
             onClick={() => setMobileIndex(i => Math.max(0, i - 1))}
           >
             <ArrowLeft />
           </div>
           <div
-            className='sm:hidden absolute right-[39px] top-1/2 -translate-y-1/2 z-20 transition-opacity'
-            style={{ opacity: mobileIndex === CARDS.length - 1 ? 0.4 : 1, pointerEvents: mobileIndex === CARDS.length - 1 ? 'none' : 'auto' }}
-            onClick={() => setMobileIndex(i => Math.min(CARDS.length - 1, i + 1))}
+            className='sm:hidden absolute right-[39px] top-1/2 -translate-y-1/2 z-20'
+            onClick={() => setMobileIndex(i => Math.min(EXT_TOTAL - 1, i + 1))}
           >
             <ArrowRight />
           </div>

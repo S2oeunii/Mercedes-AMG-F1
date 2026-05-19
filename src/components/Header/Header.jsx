@@ -4,9 +4,9 @@ import NavIcon from '../../assets/icons/nav.svg';
 
 const navItems = [
   { label: 'TEAM',     to: '/team', reload: true },
-  { label: 'CAR',      to: '/' },
-  { label: 'RACE',     to: '/' },
-  { label: 'PARTNERS', to: '/' },
+  { label: 'CAR',      to: '/team', reload: true },
+  { label: 'RACE',     to: '/team', reload: true },
+  { label: 'PARTNERS', to: '/team', reload: true },
 ];
 
 const Header = ({ menuOpen: isOpen, setMenuOpen: setIsOpen }) => {
