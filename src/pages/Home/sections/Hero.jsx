@@ -1,4 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay } from 'swiper/modules';
+import 'swiper/css';
+
 import arrowDown from '../../../assets/icons/arrowDown.svg';
 import bg1 from '../../../assets/img/hero/Hero_KeyVisual-1.jpg';
 import bg2 from '../../../assets/img/hero/Hero_KeyVisual-2.jpg';
@@ -7,83 +10,52 @@ import mbg1 from '../../../assets/img/hero/Mobile_KeyVisual-1.png';
 import mbg2 from '../../../assets/img/hero/Mobile_KeyVisual-2.png';
 import mbg3 from '../../../assets/img/hero/Mobile_KeyVisual-3.png';
 
-const bgImages   = [bg1, bg2, bg3];
-const mbgImages  = [mbg1, mbg2, mbg3];
+const desktopBgs = [bg1, bg2, bg3];
+const mobileBgs  = [mbg1, mbg2, mbg3];
 
-function Hero({ onScrollDown, step, setStep, isActive }) {
-  const isScrolling = useRef(false);
-  const stepRef = useRef(step);
+const autoplayConfig = {
+  delay: 1000,
+  disableOnInteraction: false,
+};
 
-  useEffect(() => {
-    stepRef.current = step;
-  }, [step]);
-
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleWheel = (e) => {
-      e.preventDefault();
-      if (isScrolling.current) return;
-
-      if (e.deltaY > 0) {
-        if (stepRef.current === 2) {
-          onScrollDown?.();
-          return;
-        }
-        isScrolling.current = true;
-        setStep((prev) => Math.min(prev + 1, 2));
-        setTimeout(() => { isScrolling.current = false; }, 800);
-      } else {
-        if (stepRef.current === 0) return;
-        isScrolling.current = true;
-        setStep((prev) => Math.max(prev - 1, 0));
-        setTimeout(() => { isScrolling.current = false; }, 800);
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, [isActive, onScrollDown, setStep]);
-
+function Hero({ onScrollDown, step, setStep }) {
   return (
     // 260518 수정사항 : 메인 swiper로 변경 -> 슬라이드로
     <section className="flex justify-between max-sm:items-start sm:items-end max-sm:pt-[171px] sm:pt-[25.5vw] px-[5.2vw] pb-[5.2vw] min-h-screen relative overflow-hidden">
 
-      {/* 데스크탑 배경 */}
-      <div
-        className="hidden sm:flex absolute inset-0"
-        style={{
-          width: `${bgImages.length * 100}vw`,
-          transform: `translateX(-${step * 100}vw)`,
-          transition: 'transform 0.85s cubic-bezier(0.77, 0, 0.175, 1)',
-        }}
+      {/* 데스크탑 — 가로 스와이퍼 */}
+      <Swiper
+        modules={[Autoplay]}
+        direction="horizontal"
+        autoplay={autoplayConfig}
+        speed={850}
+        loop={true}
+        onSlideChange={(swiper) => setStep(swiper.realIndex)}
+        className="!hidden sm:!block !absolute !inset-0 !w-full !h-full"
       >
-        {bgImages.map((img, i) => (
-          <div
-            key={i}
-            className="h-full bg-cover bg-center flex-shrink-0"
-            style={{ width: '100vw', backgroundImage: `url(${img})` }}
-          />
+        {desktopBgs.map((img, i) => (
+          <SwiperSlide key={i} className="!w-full !h-full">
+            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${img})` }} />
+          </SwiperSlide>
         ))}
-      </div>
+      </Swiper>
 
-      {/* 모바일 배경 — 세로 슬라이드 */}
-      <div
-        className="sm:hidden absolute inset-0 flex flex-col"
-        style={{
-          height: `${mbgImages.length * 100}vh`,
-          transform: `translateY(-${step * 100}vh)`,
-          transition: 'transform 0.85s cubic-bezier(0.77, 0, 0.175, 1)',
-        }}
+      {/* 모바일 — 세로 스와이퍼 */}
+      <Swiper
+        modules={[Autoplay]}
+        direction="vertical"
+        autoplay={autoplayConfig}
+        speed={850}
+        loop={true}
+        onSlideChange={(swiper) => setStep(swiper.realIndex)}
+        className="sm:!hidden !absolute !inset-0 !w-full !h-full"
       >
-        {mbgImages.map((img, i) => (
-          <div
-            key={i}
-            className="w-full flex-shrink-0 bg-cover bg-center"
-            style={{ height: '100vh', backgroundImage: `url(${img})` }}
-          />
+        {mobileBgs.map((img, i) => (
+          <SwiperSlide key={i} className="!w-full !h-full">
+            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${img})` }} />
+          </SwiperSlide>
         ))}
-      </div>
+      </Swiper>
 
       {/* 타이틀 */}
       <h1 className="font-archivo font-black text-[clamp(40px,5.2vw,100px)] leading-none relative z-[100]">
