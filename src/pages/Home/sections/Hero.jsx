@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay } from 'swiper/modules';
 import 'swiper/css';
@@ -19,9 +20,29 @@ const autoplayConfig = {
 };
 
 function Hero({ onScrollDown, step, setStep }) {
+  const sectionRef     = useRef(null);
+  const desktopSwiper  = useRef(null);
+  const mobileSwiper   = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const action = entry.isIntersecting ? 'start' : 'stop';
+        desktopSwiper.current?.autoplay[action]();
+        mobileSwiper.current?.autoplay[action]();
+      },
+      { threshold: 0.3 },
+    );
+
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    // 260518 수정사항 : 메인 swiper로 변경 -> 슬라이드로
-    <section className="flex justify-between max-sm:items-start sm:items-end max-sm:pt-[171px] sm:pt-[25.5vw] px-[5.2vw] pb-[5.2vw] min-h-screen relative overflow-hidden">
+    <section
+      ref={sectionRef}
+      className="flex justify-between max-sm:items-start sm:items-end max-sm:pt-[171px] sm:pt-[25.5vw] px-[5.2vw] pb-[5.2vw] min-h-screen relative overflow-hidden"
+    >
 
       {/* 데스크탑 — 가로 스와이퍼 */}
       <Swiper
@@ -30,6 +51,7 @@ function Hero({ onScrollDown, step, setStep }) {
         autoplay={autoplayConfig}
         speed={850}
         loop={true}
+        onSwiper={(swiper) => { desktopSwiper.current = swiper; }}
         onSlideChange={(swiper) => setStep(swiper.realIndex)}
         className="!hidden sm:!block !absolute !inset-0 !w-full !h-full"
       >
@@ -47,6 +69,7 @@ function Hero({ onScrollDown, step, setStep }) {
         autoplay={autoplayConfig}
         speed={850}
         loop={true}
+        onSwiper={(swiper) => { mobileSwiper.current = swiper; }}
         onSlideChange={(swiper) => setStep(swiper.realIndex)}
         className="sm:!hidden !absolute !inset-0 !w-full !h-full"
       >
