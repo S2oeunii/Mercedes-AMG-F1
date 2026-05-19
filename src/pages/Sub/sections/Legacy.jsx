@@ -18,7 +18,11 @@ const Legacy = () => {
   const mobileSwiperRef = useRef(null)
   const isScrolling     = useRef(false)
   const activeIndexRef  = useRef(0)
+  const isDragging      = useRef(false)
+  const dragStartX      = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [dragOffset,  setDragOffset]  = useState(0)
+  const [isGrabbing,  setIsGrabbing]  = useState(false)
 
   useEffect(() => {
     activeIndexRef.current = activeIndex
@@ -75,6 +79,38 @@ const Legacy = () => {
   }, [])
 
   useEffect(() => { updateThumb(activeIndex) }, [activeIndex, updateThumb])
+
+  /* ── 데스크탑 이미지 드래그 ── */
+  const handleDesktopMouseDown = useCallback((e) => {
+    isDragging.current = true
+    dragStartX.current = e.clientX
+    document.body.style.userSelect = 'none'
+    setIsGrabbing(true)
+
+    const onMove = (ev) => {
+      if (!isDragging.current) return
+      setDragOffset(ev.clientX - dragStartX.current)
+    }
+    const onUp = (ev) => {
+      if (!isDragging.current) return
+      isDragging.current = false
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      setIsGrabbing(false)
+
+      const delta = ev.clientX - dragStartX.current
+      if (delta < -50) {
+        setActiveIndex(prev => Math.min(prev + 1, data.length - 1))
+      } else if (delta > 50) {
+        setActiveIndex(prev => Math.max(prev - 1, 0))
+      }
+      setDragOffset(0)
+    }
+
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
 
   /* ── 모바일 썸 드래그 (pointer events로 터치/마우스 통합) ── */
   const handleThumbPointerDown = useCallback((e) => {
@@ -145,13 +181,16 @@ const Legacy = () => {
           </p>
         </div>
 
-        {/* ── 데스크탑: CSS transform 슬라이더 (scroll 이벤트 없음 → 피드백 루프 없음) ── */}
-        <div className='hidden sm:block flex-1 min-w-0 overflow-hidden'>
+        {/* ── 데스크탑: CSS transform 슬라이더 + 마우스 드래그 ── */}
+        <div
+          className='hidden sm:block flex-1 min-w-0 overflow-hidden cursor-grab active:cursor-grabbing select-none'
+          onMouseDown={handleDesktopMouseDown}
+        >
           <div
             className='flex gap-[2.08vw]'
             style={{
-              transform: `translateX(calc(${-activeIndex} * ${STEP_VW}vw))`,
-              transition: 'transform 0.75s cubic-bezier(0.77, 0, 0.175, 1)',
+              transform: `translateX(calc(${-activeIndex} * ${STEP_VW}vw + ${dragOffset}px))`,
+              transition: isGrabbing ? 'none' : 'transform 0.75s cubic-bezier(0.77, 0, 0.175, 1)',
             }}
           >
             {data.map(({ img }, i) => (
