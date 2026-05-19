@@ -1,4 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
+import { Swiper, SwiperSlide } from 'swiper/react'
+import 'swiper/css'
 import MoreView from '../../../components/buttons/MoreView'
 
 const data = [
@@ -7,143 +9,109 @@ const data = [
   { title: ['Wins',          null            ], count: '133', img: './img/sub/wins.png'         },
 ]
 
+// 데스크탑 이미지 너비(vw) + 갭(vw) = 한 스텝 이동량
+const STEP_VW = 34.90 + 2.08
+
 const Legacy = () => {
-  const ulRef        = useRef(null)
-  const thumbRef     = useRef(null)
-  const isDragging   = useRef(false)
-  const dragStartX   = useRef(0)
-  const dragScroll   = useRef(0)
-  const targetScroll = useRef(0)
-  const rafId        = useRef(null)
+  const sectionRef      = useRef(null)
+  const thumbRef        = useRef(null)
+  const mobileSwiperRef = useRef(null)
+  const isScrolling     = useRef(false)
+  const activeIndexRef  = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const updateThumb = useCallback(() => {
-    const ul    = ulRef.current
-    const thumb = thumbRef.current
-    if (!ul || !thumb) return
-    const track       = thumb.parentElement
-    const trackWidth  = track.clientWidth
-    const ratio       = ul.clientWidth / ul.scrollWidth
-    const thumbWidth  = Math.max(trackWidth * ratio, 20)
-    const scrollable  = ul.scrollWidth - ul.clientWidth
-    const scrollRatio = scrollable > 0 ? ul.scrollLeft / scrollable : 0
-    thumb.style.width = `${thumbWidth}px`
-    thumb.style.left  = `${scrollRatio * (trackWidth - thumbWidth)}px`
-  }, [])
-
-  const handleScroll = useCallback(() => {
-    const ul = ulRef.current
-    if (!ul) return
-    const lis = ul.querySelectorAll('li')
-    if (lis.length < 2) return
-    const step = Math.abs(
-      lis[1].getBoundingClientRect().left - lis[0].getBoundingClientRect().left
-    )
-    if (!step) return
-    setActiveIndex(
-      Math.min(Math.max(Math.round(ul.scrollLeft / step), 0), data.length - 1)
-    )
-    updateThumb()
-  }, [updateThumb])
-
-  /* ── 스크롤 이벤트 ── */
   useEffect(() => {
-    const ul = ulRef.current
-    if (!ul) return
-    ul.addEventListener('scroll', handleScroll, { passive: true })
-    updateThumb()
-    return () => ul.removeEventListener('scroll', handleScroll)
-  }, [handleScroll, updateThumb])
+    activeIndexRef.current = activeIndex
+  }, [activeIndex])
 
-  /* ── 마우스 드래그 + 휠 가로 스크롤 ── */
+  /* ── 휠 → 단계별 이동
+       섹션 중앙이 뷰포트 안에 있을 때만 캡처.
+       getBoundingClientRect()로 매 이벤트마다 직접 계산 → IntersectionObserver 타이밍 이슈 없음 ── */
   useEffect(() => {
-    const ul = ulRef.current
-    if (!ul) return
+    const handleWheel = (e) => {
+      const section = sectionRef.current
+      if (!section) return
 
-    const onMouseDown = (e) => {
-      isDragging.current = true
-      dragStartX.current = e.clientX
-      dragScroll.current = ul.scrollLeft
-      ul.style.cursor = 'grabbing'
-      ul.style.scrollSnapType = 'none'
-      document.body.style.userSelect = 'none'
-    }
+      const { top, bottom } = section.getBoundingClientRect()
+      const center = (top + bottom) / 2
+      if (center < 0 || center > window.innerHeight) return
 
-    const onMouseMove = (e) => {
-      if (!isDragging.current) return
-      ul.scrollLeft = dragScroll.current - (e.clientX - dragStartX.current)
-    }
-
-    const onMouseUp = () => {
-      if (!isDragging.current) return
-      isDragging.current = false
-      ul.style.cursor = ''
-      ul.style.scrollSnapType = ''
-      document.body.style.userSelect = ''
-    }
-
-    // 세로 휠 → 부드러운 가로 스크롤 (RAF lerp)
-    const animateScroll = () => {
-      const diff = targetScroll.current - ul.scrollLeft
-      if (Math.abs(diff) < 0.5) {
-        ul.scrollLeft = targetScroll.current
-        rafId.current = null
-        return
-      }
-      ul.scrollLeft += diff * 0.1
-      rafId.current = requestAnimationFrame(animateScroll)
-    }
-
-    const onWheel = (e) => {
+      // 수평 스크롤은 무시
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+
+      const idx = activeIndexRef.current
+
+      // 첫/마지막 아이템 경계에서 페이지 스크롤 통과
+      if (e.deltaY > 0 && idx >= data.length - 1) return
+      if (e.deltaY < 0 && idx <= 0) return
+
       e.preventDefault()
-      const max = ul.scrollWidth - ul.clientWidth
-      targetScroll.current = Math.max(0, Math.min(max, targetScroll.current + e.deltaY * 1.5))
-      if (!rafId.current) rafId.current = requestAnimationFrame(animateScroll)
+      if (isScrolling.current) return
+      isScrolling.current = true
+
+      const newIndex = e.deltaY > 0
+        ? Math.min(activeIndexRef.current + 1, data.length - 1)
+        : Math.max(activeIndexRef.current - 1, 0)
+
+      setActiveIndex(newIndex)
+      mobileSwiperRef.current?.slideTo(newIndex)
+      // CSS transition(0.75s)과 동일한 타이밍으로 잠금 해제
+      setTimeout(() => { isScrolling.current = false }, 750)
     }
 
-    ul.addEventListener('mousedown', onMouseDown)
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-    ul.addEventListener('wheel', onWheel, { passive: false })
-
-    return () => {
-      ul.removeEventListener('mousedown', onMouseDown)
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-      ul.removeEventListener('wheel', onWheel)
-      if (rafId.current) cancelAnimationFrame(rafId.current)
-    }
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
   }, [])
 
-  /* ── 모바일 커스텀 스크롤바 썸 드래그 ── */
-  const handleThumbMouseDown = useCallback((e) => {
-    e.preventDefault()
-    const ul    = ulRef.current
+  /* ── 모바일 커스텀 스크롤바 썸 위치 업데이트 ── */
+  const updateThumb = useCallback((index) => {
     const thumb = thumbRef.current
-    if (!ul || !thumb) return
+    if (!thumb?.parentElement) return
+    const trackWidth = thumb.parentElement.clientWidth
+    const thumbWidth = trackWidth / data.length
+    const maxLeft    = trackWidth - thumbWidth
+    thumb.style.width = `${thumbWidth}px`
+    thumb.style.left  = index === 0 ? '0px' : `${(index / (data.length - 1)) * maxLeft}px`
+  }, [])
 
-    const startX          = e.clientX
-    const startScrollLeft = ul.scrollLeft
+  useEffect(() => { updateThumb(activeIndex) }, [activeIndex, updateThumb])
 
-    const onMove = (moveEvent) => {
-      const trackWidth = thumb.parentElement.clientWidth
-      const thumbWidth = parseFloat(thumb.style.width) || 0
-      const scrollable = ul.scrollWidth - ul.clientWidth
-      ul.scrollLeft = startScrollLeft + ((moveEvent.clientX - startX) / (trackWidth - thumbWidth)) * scrollable
+  /* ── 모바일 썸 드래그 (pointer events로 터치/마우스 통합) ── */
+  const handleThumbPointerDown = useCallback((e) => {
+    e.preventDefault()
+    const thumb = thumbRef.current
+    if (!thumb) return
+
+    thumb.setPointerCapture(e.pointerId)
+
+    const startX     = e.clientX
+    const startLeft  = parseFloat(thumb.style.left) || 0
+    const trackWidth = thumb.parentElement.clientWidth
+    const thumbWidth = parseFloat(thumb.style.width) || 0
+
+    const onMove = (ev) => {
+      const newLeft  = Math.max(0, Math.min(trackWidth - thumbWidth, startLeft + ev.clientX - startX))
+      thumb.style.left = `${newLeft}px`
+      const ratio    = thumbWidth < trackWidth ? newLeft / (trackWidth - thumbWidth) : 0
+      const newIndex = Math.round(ratio * (data.length - 1))
+      mobileSwiperRef.current?.slideTo(newIndex)
     }
     const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
+      thumb.removeEventListener('pointermove', onMove)
+      thumb.removeEventListener('pointerup', onUp)
     }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
+
+    thumb.addEventListener('pointermove', onMove)
+    thumb.addEventListener('pointerup', onUp)
   }, [])
 
   const { title, count } = data[activeIndex]
 
   return (
-    <div className='flex flex-col px-6 py-25 sm:px-[14.58vw] sm:pt-[9.38vw] sm:pb-[10.42vw] overflow-hidden'>
+    <div
+      ref={sectionRef}
+      className='flex flex-col px-6 py-25 sm:px-[14.58vw] sm:pt-[9.38vw] sm:pb-[10.42vw] overflow-hidden'
+    >
 
       {/* 상단 텍스트 */}
       <div className='flex flex-col gap-[28px] sm:gap-[5.21vw] w-full text-left items-start'>
@@ -157,12 +125,11 @@ const Legacy = () => {
         </p>
       </div>
 
-{/* 260518 수정사항 : 스크롤에 따라 다음으로 이동하도록 */}
-      {/* 중단: ulDesc + ul */}
+      {/* 중단 */}
       <div className='flex flex-col-reverse sm:flex-row gap-[28px] sm:gap-[5.47vw] sm:items-end
           mt-20 sm:mt-[8.75vw] sm:mb-[6.56vw] sm:ml-[9.38vw]'>
 
-        {/* ulDesc */}
+        {/* 타이틀 + 카운트 */}
         <div className='w-full sm:w-auto shrink-0 flex sm:flex-col sm:gap-[1.56vw]
             justify-between sm:justify-center items-start
             text-white hover:text-[#00F4D0] font-archivo font-light tracking-none
@@ -178,26 +145,50 @@ const Legacy = () => {
           </p>
         </div>
 
-        {/* ul + 모바일 커스텀 스크롤바 */}
-        <div className='flex flex-col flex-1 min-w-0'>
-          <ul
-            ref={ulRef}
-            className='flex gap-5 sm:gap-[2.08vw] sm:pr-[8.59vw]
-              overflow-x-auto scrollbar-hide snap-x snap-mandatory cursor-grab'
+        {/* ── 데스크탑: CSS transform 슬라이더 (scroll 이벤트 없음 → 피드백 루프 없음) ── */}
+        <div className='hidden sm:block flex-1 min-w-0 overflow-hidden'>
+          <div
+            className='flex gap-[2.08vw]'
+            style={{
+              transform: `translateX(calc(${-activeIndex} * ${STEP_VW}vw))`,
+              transition: 'transform 0.75s cubic-bezier(0.77, 0, 0.175, 1)',
+            }}
           >
             {data.map(({ img }, i) => (
-              <li key={i} className='w-[345px] sm:w-[34.90vw] shrink-0 snap-start'>
+              <div key={i} className='w-[34.90vw] shrink-0'>
                 <img className='w-full h-auto pointer-events-none' src={img} alt='' draggable='false' />
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
+        </div>
 
-          {/* 모바일 전용 커스텀 스크롤바 */}
-          <div className='sm:hidden mt-[50px] relative h-[5px] rounded-full bg-white/30'>
+        {/* ── 모바일: Swiper + 커스텀 스크롤바 ── */}
+        <div className='sm:hidden flex flex-col flex-1 min-w-0 gap-[50px]'>
+          <Swiper
+            loop={false}
+            onSwiper={(swiper) => {
+              mobileSwiperRef.current = swiper
+              updateThumb(0)
+            }}
+            onSlideChange={(swiper) => {
+              setActiveIndex(swiper.activeIndex)
+              updateThumb(swiper.activeIndex)
+            }}
+            className='w-full'
+          >
+            {data.map(({ img }, i) => (
+              <SwiperSlide key={i}>
+                <img className='w-full h-auto pointer-events-none' src={img} alt='' draggable='false' />
+              </SwiperSlide>
+            ))}
+          </Swiper>
+
+          {/* 커스텀 스크롤바 */}
+          <div className='relative h-[5px] rounded-full bg-white/30'>
             <div
               ref={thumbRef}
-              onMouseDown={handleThumbMouseDown}
-              className='absolute top-0 h-full rounded-full cursor-pointer'
+              onPointerDown={handleThumbPointerDown}
+              className='absolute top-0 h-full rounded-full cursor-pointer touch-none'
               style={{
                 background: 'linear-gradient(to right, #008E79 0%, #00F4D0 50%, #008E79 100%)',
                 width: '0px',
@@ -206,6 +197,7 @@ const Legacy = () => {
             />
           </div>
         </div>
+
       </div>
 
       {/* MORE VIEW */}

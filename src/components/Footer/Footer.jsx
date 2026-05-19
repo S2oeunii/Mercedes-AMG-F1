@@ -65,7 +65,7 @@ const Footer = () => {
             </div>
 
             <div className='flex flex-col gap-[8px] items-center justify-center font-pretendard font-light leading-normal'>
-              <p className='text-white text-[14px] tracking-tight'>
+              <p className='text-white text-center sm:text-right text-[14px] tracking-tight'>
                 미디어 센터 | 메르세데스-벤츠 아카이브<br />
                 쿠키 정책 | 개인정보 처리방침 | 이용 약관
               </p>
