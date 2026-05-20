@@ -269,7 +269,7 @@ const Race = () => {
 
         {/* 카드 영역 */}
         <div className='relative sm:h-[20.93vw] mt-15 mb-[45px] sm:mt-[6.41vw] sm:mb-[1.61vw] -mx-6 sm:mx-0'>
-
+{/* 260520 수정사항 : 카드 불러와지는거 어색 => 해결 / 스크롤 이벤트 제거 */}
           {/* ── Desktop 3D carousel ── */}
           <div
             ref={trackRef}

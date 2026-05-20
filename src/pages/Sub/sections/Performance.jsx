@@ -26,6 +26,11 @@ const Performance = () => {
         </p>
       </div>
 
+{/* 
+  260520
+  이미지 중간에 끊기지 않게
+*/}
+
       {/* imgContainer: 부모 padding을 음수 마진으로 탈출, overflow-hidden으로 뷰포트 클리핑 */}
       <div className='imgContainer -mx-6 sm:-mx-[14.58vw] overflow-hidden'>
         {/* 이미지를 2벌 렌더링 → translateX(-50%)로 원본 1벌 너비만큼 이동 → 무한 루프 */}

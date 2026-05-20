@@ -161,6 +161,12 @@ const Legacy = () => {
         </p>
       </div>
 
+{/* 
+  260520 수정사항
+  swiper로 할거면 -> 스크롤 제거
+  스크롤 이벤트로 스크롤 프로그레스 0.4이상일때 다음 사진과 숫자로 변경
+  0.8일때 그 다음 사진과 숫자로 변경
+*/}
       {/* 중단 */}
       <div className='flex flex-col-reverse sm:flex-row gap-[28px] sm:gap-[5.47vw] sm:items-end
           mt-20 sm:mt-[8.75vw] sm:mb-[6.56vw] sm:ml-[9.38vw]'>
